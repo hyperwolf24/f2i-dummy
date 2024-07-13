@@ -1,0 +1,35 @@
+# Start from a small, secure base image
+FROM golang:1.21-alpine AS builder
+
+# Create a non-root user
+RUN adduser -D -g '' appuser
+
+# Set the working directory
+WORKDIR /app
+
+# Copy go mod and sum files
+COPY go.mod go.sum ./
+
+# Download dependencies
+RUN go mod download
+
+# Copy the source code
+COPY . .
+
+# Build the application
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
+
+# Start a new stage from scratch
+FROM alpine:latest  
+
+# Import the user and group files from the builder
+COPY --from=builder /etc/passwd /etc/passwd
+
+# Copy the built executable
+COPY --from=builder /app/main /app/
+
+# Use the non-root user
+USER appuser
+
+# Run the application
+CMD ["/app/main"]
